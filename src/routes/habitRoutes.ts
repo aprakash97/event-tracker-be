@@ -1,8 +1,10 @@
 import { Router } from "express";
 import { z } from 'zod'
 import { validateBody, validateParams } from "../middleware/validation.ts";
+import { authenticateToken } from "../middleware/auth.ts";
 
 const router = Router()
+router.use(authenticateToken)
 
 const completeHabitSchema = z.object({
     id: z.string()
