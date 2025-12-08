@@ -119,3 +119,104 @@ export const updateHabit = async (
         res.status(500).json({ error: 'Failed to update habit' })
     }
 }
+
+//cons
+// Security: any user can access any habit if they know the ID.
+// No filtering based on authenticated user.
+// No relation loading (tags, entries). -  just checking db for relevant row on habits table
+// No filtering based on authenticated user.
+// No data transformation.
+// No ordering of entries.
+// No limit on returned entries (if added later)
+// No proper 404 handling.
+
+// export const getOneHabit = async (
+//     req: AuthenticatedRequest,
+//     res: Response
+// ) => {
+//     try {
+//         const id = req.params.id
+//         const result = await db.query.habits.findFirst(({
+//             where: eq(habits.id, id)
+//         }))
+
+//         res.status(200).json({
+//             habit: result
+//         })
+//     } catch (e) {
+//         console.error('Fetch Habit error', e)
+//         res.status(500).json({ error: 'Failed to fetch habit' })
+//     }
+// }
+
+export const getHabitById = async (
+    req: AuthenticatedRequest,
+    res: Response
+) => {
+    try {
+        const { id } = req.params
+        const userId = req.user!.id // token
+
+        const habit = await db.query.habits.findFirst({
+            where: and(eq(habits.id, id), eq(habits.userId, userId)), // based on authentication
+            with: {
+                habitTags: {
+                    with: {
+                        tag: true,
+                    },
+                },
+                entries: {
+                    orderBy: [desc(entries.completionDate)],
+                    limit: 10, // Recent entries only
+                },
+            },
+        })
+
+        if (!habit) {
+            return res.status(404).json({ error: 'Habit not found' })
+        }
+
+        // Transform the data
+        const habitWithTags = {
+            ...habit,
+            tags: habit.habitTags.map((ht) => ht.tag),
+            habitTags: undefined,
+        }
+
+        res.json({
+            habit: habitWithTags,
+        })
+    } catch (error) {
+        console.error('Get habit error:', error)
+        res.status(500).json({ error: 'Failed to fetch habit' })
+    }
+}
+
+export const deleteHabit = async (
+    req: AuthenticatedRequest,
+    res: Response
+) => {
+    try {
+        const { id } = req.params
+        const userId = req!.user.id
+
+        const [deleteHabit] = await db.delete(habits)
+            .where(and(eq(habits.id, id), eq(habits.userId, userId)))
+            .returning() //.returning() always returns an array. so we're destructing, extracting first element
+
+
+        if (!deleteHabit) {
+            res.status(403).json({ message: 'Response not found' })
+        }
+
+        res.status(200).json({
+            habit: deleteHabit
+        })
+    } catch (e) {
+        console.error('Delete habit error:', e)
+        res.status(500).json({ error: 'Failed to delete habit' })
+    }
+}
+
+// delete/update need .returning() if you want the deleted/updated record.
+// GET queries don’t use .returning() because they use .findFirst() / .findMany()
