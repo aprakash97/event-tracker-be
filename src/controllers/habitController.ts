@@ -19,6 +19,7 @@ export const createHabit = async (
                 targetCount,
             }).returning()
 
+            //tags can be added for habit while creating habits
             if (tagIds && tagIds.length > 0) {
                 const habitTagValues = tagIds.map((tagId) => ({
                     habitId: newHabit.id,
